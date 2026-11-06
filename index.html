@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Журнал учителя</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1b1d22;--mut:#6b7280;--bd:#e5e7eb;--ac:#2563eb;--g:#16a34a;--r:#dc2626;--o:#d97706;--gy:#6b7280;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111317;--card:#1c1f26;--tx:#f1f3f6;--mut:#9aa3b2;--bd:#2c303a;--ac:#60a5fa;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111317;--card:#1c1f26;--tx:#f1f3f6;--mut:#9aa3b2;--bd:#2c303a;--ac:#60a5fa;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px -apple-system,system-ui,"Segoe UI",sans-serif;padding:12px;max-width:640px;margin:0 auto}
+select,input,textarea,button{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 12px}
+button{cursor:pointer;font-weight:600}
+.bar{display:flex;gap:6px;margin-bottom:10px}
+.bar button{flex:1;padding:10px 0}
+.bar .on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.r2{display:flex;gap:8px;margin-bottom:10px}.r2>*{flex:1;min-width:0}
+.sum{color:var(--mut);font-size:14px;margin:6px 2px 10px}
+.row{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:8px 10px;margin-bottom:6px;min-height:52px}
+.nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avg{color:var(--mut);font-size:12px}
+.gd{width:46px;height:40px;padding:0;font-size:19px}
+.sm{padding:8px 10px;font-size:14px}
+.hb{min-width:104px;padding:8px 6px;font-size:14px}
+textarea{width:100%;min-height:90px;margin-bottom:10px}
+.pn{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:10px}
+#sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px));display:none;box-shadow:0 -8px 30px #0004}
+#sheet .gr{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
+#sheet .gr button{padding:14px 0;font-size:20px}
+.c9{background:var(--g);color:#fff;border-color:var(--g)}.c7{background:var(--ac);color:#fff;border-color:var(--ac)}.c5{background:var(--o);color:#fff;border-color:var(--o)}.c1{background:var(--r);color:#fff;border-color:var(--r)}
+.good{background:var(--g);color:#fff;border-color:var(--g)}.bad{background:var(--r);color:#fff;border-color:var(--r)}
+.h-d{background:var(--g);color:#fff}.h-p{background:var(--o);color:#fff}.h-n{background:var(--r);color:#fff}.h-a{background:var(--gy);color:#fff}
+</style>
+</head>
+<body>
+<div class="bar" id="cls"></div>
+<div class="r2"><select id="subj"></select><input type="date" id="date"></div>
+<div class="bar" id="tabs"></div>
+<div class="r2"><input id="addIn" placeholder="Имя ученика (один раз, запомнится)" enterkeyhint="done"><button id="addBtn" style="flex:0 0 110px">Добавить</button></div>
+<div id="info"></div>
+<div id="main"></div>
+<div class="r2" style="margin-top:12px"><button id="bCopy">Скопировать отчёт</button><button id="bRos">Список класса</button></div>
+<div id="ros"></div>
+<div id="sheet"></div>
+<script>
+const KEY='teacher-v1',SUB=['История Казахстана','Всемирная история','География','Естествознание'],N={5:20,6:14,7:8,8:13,9:5};
+const uid=()=>Math.random().toString(36).slice(2,9);
+let S=null;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.cls){S={cls:{},d:{},t:{},cur:{g:5,s:0,tab:'g'}};for(const g in N)S.cls[g]=[]}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+(function(){const used=new Set();for(const k in S.d){const o=S.d[k];['g','b','h'].forEach(t=>{for(const i in o[t])used.add(i)})}for(const g in S.cls)S.cls[g]=S.cls[g].filter(s=>!(/^Ученик \d+$/.test(s.name)&&!used.has(s.id)))})();
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const td=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+$('date').value=td();
+const key=()=>S.cur.g+'|'+S.cur.s+'|'+$('date').value;
+const day=()=>S.d[key()]||{g:{},b:{},h:{}};
+const wr=()=>S.d[key()]||(S.d[key()]={g:{},b:{},h:{}});
+const studs=()=>S.cls[S.cur.g];
+const HL={d:'Сделал',p:'Частично',n:'Не сделал',a:'Отсутствие'},HN={'':'d',d:'p',p:'n',n:'a',a:''};
+const gc=n=>n>=9?'c9':n>=7?'c7':n>=5?'c5':'c1';
+let pick=null;
+
+function avg(id){const p=S.cur.g+'|'+S.cur.s+'|';let a=[];for(const k in S.d)if(k.startsWith(p)){const v=S.d[k].g[id];if(v)a.push(v)}return a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(1):''}
+
+function render(){
+  $('cls').innerHTML=[5,6,7,8,9].map(g=>`<button class="${g==S.cur.g?'on':''}" data-g="${g}">${g} кл</button>`).join('');
+  $('subj').innerHTML=SUB.map((s,i)=>`<option value="${i}" ${i==S.cur.s?'selected':''}>${s}</option>`).join('');
+  $('tabs').innerHTML=[['g','Оценки'],['b','Поведение'],['h','Домашка']].map(([t,n])=>`<button class="${t==S.cur.tab?'on':''}" data-t="${t}">${n}</button>`).join('');
+  const L=studs(),D=day(),tab=S.cur.tab;let html='',info='';
+  if(tab==='g'){
+    const v=L.map(s=>D.g[s.id]).filter(Boolean);
+    info=`Оценено ${v.length} из ${L.length}`+(v.length?`, средний за день ${(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1)}`:'');
+    html=L.map(s=>{const g=D.g[s.id],a=avg(s.id);return `<div class="row"><span class="nm">${esc(s.name)}</span><span class="avg">${a?'ср '+a:''}</span><button class="gd ${g?gc(g):''}" data-p="${s.id}">${g||'—'}</button></div>`}).join('');
+  }else if(tab==='b'){
+    const gd=L.filter(s=>D.b[s.id]==='g').length,bd=L.filter(s=>D.b[s.id]==='b').length;
+    info=`Хорошее: ${gd}, плохое: ${bd}`;
+    html=L.map(s=>{const b=D.b[s.id];return `<div class="row"><span class="nm">${esc(s.name)}</span><button class="sm ${b==='g'?'good':''}" data-b="g" data-i="${s.id}">Хорошее</button><button class="sm ${b==='b'?'bad':''}" data-b="b" data-i="${s.id}">Плохое</button></div>`}).join('');
+  }else{
+    const c=x=>L.filter(s=>D.h[s.id]===x).length;
+    info=`Сделали ${c('d')}, частично ${c('p')}, не сделали ${c('n')}, отсутствуют ${c('a')}`;
+    html=`<textarea id="task" placeholder="Что задали на дом…">${esc(S.t[key()]||'')}</textarea>`+L.map(s=>{const h=D.h[s.id]||'';return `<div class="row"><span class="nm">${esc(s.name)}</span><button class="hb ${h?'h-'+h:''}" data-h="${s.id}">${h?HL[h]:'Не отмечен'}</button></div>`}).join('');
+  }
+  if(!L.length)html+='<div class="sum">В этом классе пока нет учеников. Впишите имена выше: они сохранятся для всех предметов и дней.</div>';
+  $('info').innerHTML=`<div class="sum">${S.cur.g} класс (${L.length} из ${N[S.cur.g]}) · ${SUB[S.cur.s]} · ${info}</div>`;
+  $('main').innerHTML=html;
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{pick=b.dataset.p;sheet()});
+  document.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{const d=wr(),i=b.dataset.i;if(d.b[i]===b.dataset.b)delete d.b[i];else d.b[i]=b.dataset.b;save();render()});
+  document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{const d=wr(),i=b.dataset.h,n=HN[d.h[i]||''];if(n)d.h[i]=n;else delete d.h[i];save();render()});
+  const t=$('task');if(t)t.oninput=()=>{if(t.value)S.t[key()]=t.value;else delete S.t[key()];save()};
+}
+function sheet(){
+  const s=studs().find(x=>x.id===pick),cur=day().g[pick];
+  $('sheet').style.display='block';
+  $('sheet').innerHTML=`<b>${esc(s.name)}</b><div class="gr">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="${n===cur?gc(n):''}" data-n="${n}">${n}</button>`).join('')}</div><div class="r2"><button id="clr">Снять оценку</button><button id="cl">Закрыть</button></div>`;
+  $('sheet').querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{wr().g[pick]=+b.dataset.n;save();close();render()});
+  $('clr').onclick=()=>{delete wr().g[pick];save();close();render()};
+  $('cl').onclick=close;
+}
+function close(){$('sheet').style.display='none'}
+$('cls').onclick=e=>{const g=e.target.dataset.g;if(g){S.cur.g=+g;save();close();render()}};
+$('tabs').onclick=e=>{const t=e.target.dataset.t;if(t){S.cur.tab=t;save();close();render()}};
+$('subj').onchange=e=>{S.cur.s=+e.target.value;save();close();render()};
+$('date').onchange=()=>{close();render()};
+$('bCopy').onclick=()=>{
+  const L=studs(),D=day(),tab=S.cur.tab;
+  let t=`${S.cur.g} класс, ${SUB[S.cur.s]}, ${$('date').value}\n`;
+  if(tab==='g')t+='Оценки:\n'+L.map(s=>`${s.name}: ${D.g[s.id]||'—'}`).join('\n');
+  else if(tab==='b')t+='Поведение:\n'+L.map(s=>`${s.name}: ${D.b[s.id]==='g'?'хорошее':D.b[s.id]==='b'?'плохое':'—'}`).join('\n');
+  else t+=`Задание: ${S.t[key()]||'—'}\n`+L.map(s=>`${s.name}: ${D.h[s.id]?HL[D.h[s.id]]:'—'}`).join('\n');
+  const ok=()=>{$('bCopy').textContent='Скопировано ✓'};
+  try{navigator.clipboard.writeText(t).then(ok,()=>$('ros').innerHTML=`<div class="pn"><textarea readonly>${esc(t)}</textarea></div>`)}catch(e){$('ros').innerHTML=`<div class="pn"><textarea readonly>${esc(t)}</textarea></div>`}
+};
+$('bRos').onclick=()=>{
+  $('ros').innerHTML=`<div class="pn"><div class="sum">Список ${S.cur.g} класса: один ученик на строку (или через запятую). Можно вставить весь список.</div><textarea id="ta" style="min-height:220px">${esc(studs().map(s=>s.name).join('\n'))}</textarea><div class="r2"><button id="sv" class="on" style="background:var(--ac);color:#fff">Сохранить</button><button id="xx">Отмена</button></div></div>`;
+  $('xx').onclick=()=>$('ros').innerHTML='';
+  $('sv').onclick=()=>{
+    const names=$('ta').value.split(/[\n\r,;\t]+/).map(s=>s.trim()).filter(Boolean);
+    const old=new Map(studs().map(s=>[s.name,s.id]));
+    S.cls[S.cur.g]=names.map(n=>({id:old.get(n)||uid(),name:n}));
+    save();$('ros').innerHTML='';render();
+  };
+};
+function addSt(){const names=$('addIn').value.split(/[\n\r,;\t]+/).map(s=>s.trim()).filter(Boolean);if(!names.length)return;names.forEach(n=>studs().push({id:uid(),name:n}));$('addIn').value='';save();render();$('addIn').focus()}
+$('addBtn').onclick=addSt;$('addIn').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addSt()}};
+save();render();
+</script>
+</body>
+</html>
